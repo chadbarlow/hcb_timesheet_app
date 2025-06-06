@@ -28,24 +28,15 @@ registerFontFamily(
     "SourceSansPro",
     normal="SourceSansPro",
     bold="SourceSansPro-Bold",
-    italic="SourceSansPro",        # or add your italic file if available
-    boldItalic="SourceSansPro-Bold" # or add your bold-italic file if available
+    italic="SourceSansPro",        
+    boldItalic="SourceSansPro-Bold"
 )
 
-# -------------------------------
-# App Title
-# -------------------------------
 st.title("MileIQ Billables Processor, Editor, and PDF Export")
 
-# -------------------------------
-# Utility: Round hours up to nearest quarter hour (0.25 increments)
-# -------------------------------
 def round_to_quarter_hour(hours: float) -> float:
     return math.ceil(hours * 4) / 4
 
-# -------------------------------
-# File uploader: accept multiple MileIQ CSVs
-# -------------------------------
 uploaded_files = st.file_uploader(
     "Upload one or more MileIQ CSVs (duplicate files will be ignored)",
     type=["csv"],
@@ -53,7 +44,6 @@ uploaded_files = st.file_uploader(
 )
 
 def deduplicate_files(files):
-    """Return list of files with duplicate (name, size) removed."""
     seen = set()
     unique = []
     for f in files:
@@ -63,9 +53,6 @@ def deduplicate_files(files):
             seen.add(file_id)
     return unique
 
-# -------------------------------
-# CSV Loading and Cleaning
-# -------------------------------
 def load_and_clean_mileiq_csv(uploaded_file) -> pd.DataFrame:
     content = uploaded_file.read().decode("utf-8")
     lines = content.splitlines()
@@ -85,18 +72,12 @@ def load_and_clean_mileiq_csv(uploaded_file) -> pd.DataFrame:
     df = df.drop(columns=cols_to_drop, errors='ignore')
     return df
 
-# -------------------------------
-# Timestamp Parsing
-# -------------------------------
 def parse_timestamps(df: pd.DataFrame) -> pd.DataFrame:
     fmt = '%m/%d/%Y %H:%M'
     df['start'] = pd.to_datetime(df['START_DATE*'], format=fmt)
     df['end'] = pd.to_datetime(df['END_DATE*'], format=fmt)
     return df
 
-# -------------------------------
-# Site Extraction
-# -------------------------------
 def extract_sites(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
     orig = df['START*'].astype(str).str.rsplit('|', n=1, expand=True)
@@ -109,9 +90,6 @@ def extract_sites(df: pd.DataFrame) -> pd.DataFrame:
         lambda x: x['dest_name'] if x['dest_type'] == 'Homeowner' else x['dest_type'], axis=1)
     return df.sort_values('start').reset_index(drop=True)
 
-# -------------------------------
-# Clamp Segments to Workday Window
-# -------------------------------
 def dynamic_clamp(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
     df['date'] = df['start'].dt.normalize()
@@ -127,9 +105,6 @@ def dynamic_clamp(df: pd.DataFrame) -> pd.DataFrame:
     df['duration_hr'] = (df['clamped_end'] - df['clamped_start']).dt.total_seconds() / 3600
     return df
 
-# -------------------------------
-# Build Segments (including gaps)
-# -------------------------------
 def build_segments(df: pd.DataFrame) -> List[Dict]:
     segments = []
     records = df.to_dict('records')
@@ -156,9 +131,6 @@ def build_segments(df: pd.DataFrame) -> List[Dict]:
         })
     return segments
 
-# -------------------------------
-# Allocate Segment Hours to Clients
-# -------------------------------
 def allocate_hours(segments: List[Dict]) -> pd.DataFrame:
     home_depart = sorted([s for s in segments if s['orig_type'] == 'Homeowner'], key=lambda x: x['start'])
     home_arrive = sorted([s for s in segments if s['dest_type'] == 'Homeowner'], key=lambda x: x['end'])
@@ -183,9 +155,6 @@ def allocate_hours(segments: List[Dict]) -> pd.DataFrame:
         allocs.append((date, owner, seg['duration']))
     return pd.DataFrame(allocs, columns=['date', 'client', 'hours'])
 
-# -------------------------------
-# Pivot Allocations to Table
-# -------------------------------
 def pivot_billables(df: pd.DataFrame) -> pd.DataFrame:
     df['date'] = pd.to_datetime(df['date'])
     df['client'] = df['client'].apply(
@@ -211,9 +180,6 @@ def pivot_billables(df: pd.DataFrame) -> pd.DataFrame:
         pivot = pd.concat([pivot, others])
     return pivot
 
-# -------------------------------
-# Week Calculation Helpers
-# -------------------------------
 def get_monday(date):
     return date - datetime.timedelta(days=date.weekday())
 
@@ -229,24 +195,31 @@ def week_columns(dates):
     col_order = [monday + datetime.timedelta(days=i) for i in range(6)]
     return col_order, [col_map[i] for i in range(6)], monday
 
-# -------------------------------
-# PDF Table Formatting
-# -------------------------------
+def add_total_footer(df, day_cols):
+    footer_vals = ["Total"] + [df[col].replace("", 0).astype(float).sum() for col in day_cols]
+    for i in range(1, len(footer_vals)):
+        v = footer_vals[i]
+        if v == 0:
+            footer_vals[i] = ""
+        else:
+            footer_vals[i] = str(int(v)) if v == int(v) else str(v)
+    footer_df = pd.DataFrame([footer_vals], columns=["Client"] + day_cols)
+    df_with_footer = pd.concat([df, footer_df], ignore_index=True)
+    return df_with_footer
+
 def reformat_for_pdf(pivot: pd.DataFrame):
     date_cols = [col for col in pivot.columns if isinstance(col, pd.Timestamp)]
     week_order, day_labels, monday = week_columns(date_cols)
     table = pd.DataFrame(index=pivot.index)
     for d in week_order:
         table[d] = pivot[d] if d in pivot.columns else 0.0
-    existing_days = [d for d in week_order if d in pivot.columns]
-    table['Subtotal'] = pivot[existing_days].sum(axis=1) if existing_days else 0
-    table.index = [str(idx).title() for idx in table.index]  # Proper noun case
-    col_labels = ['Client'] + day_labels + ['Subtotal']
+    # Compute Subtotals per row (client)
+    table['Subtotals'] = table[week_order].sum(axis=1)
+    table.index = [str(idx).title() for idx in table.index]
+    col_labels = ['Client'] + day_labels + ['Subtotals']
     table = table.reset_index()
     table.columns = col_labels
-
-    # Filter out clients with 0 across all day columns and Total
-    data_cols = day_labels + ['Subtotal']
+    data_cols = day_labels
     def has_nonzero(row):
         for x in row:
             try:
@@ -256,14 +229,14 @@ def reformat_for_pdf(pivot: pd.DataFrame):
                 if x not in ("", "0"):
                     return True
         return False
+    # Remove all-0 clients
     table = table[table[data_cols].apply(has_nonzero, axis=1)].reset_index(drop=True)
-
-    # Move 'Other' to bottom
+    # Move "Other" row to bottom if present
     if 'Other' in table['Client'].values:
         other_row = table[table['Client'] == 'Other']
         table = table[table['Client'] != 'Other']
         table = pd.concat([table, other_row], ignore_index=True)
-
+    # Format cells
     def format_for_pdf_cell(x):
         if isinstance(x, (int, float)):
             if x == 0:
@@ -272,9 +245,6 @@ def reformat_for_pdf(pivot: pd.DataFrame):
         return x
     return table.applymap(format_for_pdf_cell), week_order, monday
 
-# -------------------------------
-# PDF Export with ReportLab
-# -------------------------------
 def export_weekly_pdf_reportlab(table_df, week_days, total_hours) -> bytes:
     tmp_fp = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
     doc = SimpleDocTemplate(
@@ -283,36 +253,24 @@ def export_weekly_pdf_reportlab(table_df, week_days, total_hours) -> bytes:
         leftMargin=0.5 * inch, rightMargin=0.5 * inch,
         topMargin=0.5 * inch, bottomMargin=0.5 * inch,
     )
-
-    # --- HEADER SECTION ---
     header_style = ParagraphStyle(
         name="Header",
         fontName="SourceSansPro-Bold",
         fontSize=18,
         alignment=TA_CENTER,
         spaceAfter=28,
-        textColor=colors.HexColor("#373737"),
-    )
-    subheader_style = ParagraphStyle(
-        name="SubHeader",
-        fontName="SourceSansPro",
-        fontSize=10,
-        alignment=TA_CENTER,
-        spaceAfter=40,
-        textColor=colors.HexColor("#373737"),
+        textColor=colors.HexColor("#31333f"),
     )
     label_style = ParagraphStyle(
         name="Label",
         fontName="SourceSansPro",
         fontSize=10,
-        alignment=0,  # 0 = left
+        alignment=0,
         spaceAfter=10,
-        textColor=colors.HexColor("#373737"),
+        textColor=colors.HexColor("#31333f"),
     )
-
     elements = []
     elements.append(Paragraph("HCB TIMESHEET", header_style))
-
     week_of_str = f"Week of: <b>{min(week_days).strftime('%B %-d, %Y')}</b>"
     total_hours_str = (
         f'Total Hours: <b><font backcolor="#fffac1" color="#373737">{int(total_hours) if total_hours == int(total_hours) else total_hours}</font></b>'
@@ -322,8 +280,6 @@ def export_weekly_pdf_reportlab(table_df, week_days, total_hours) -> bytes:
     elements.append(Paragraph(week_of_str, label_style))
     elements.append(Paragraph(total_hours_str, label_style))
     elements.append(Spacer(1, 0.18 * inch))
-
-    # --- TABLE DATA ---
     data = [list(table_df.columns)] + [list(row) for row in table_df.itertuples(index=False)]
     page_width = landscape(letter)[0] - doc.leftMargin - doc.rightMargin
     num_cols = len(table_df.columns)
@@ -332,44 +288,30 @@ def export_weekly_pdf_reportlab(table_df, week_days, total_hours) -> bytes:
     col_widths = [client_col_w] + [other_col_w] * (num_cols - 1)
     tbl = Table(data, colWidths=col_widths, repeatRows=1)
     style = TableStyle()
-
-    # --- HEADER ROW ---
-    style.add("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#b6bbbf"))
-    style.add("TEXTCOLOR", (0, 0), (-1, 0), colors.HexColor("#373737"))
-    style.add("FONTNAME", (0, 0), (-1, 0), "SourceSansPro-Bold")
+    # Header row
+    style.add("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#f0f2f6"))
+    style.add("TEXTCOLOR", (0, 0), (-1, 0), colors.HexColor("#81828a"))
+    style.add("FONTNAME", (0, 0), (-1, 0), "SourceSansPro")
     style.add("FONTSIZE", (0, 0), (-1, 0), 10)
     style.add("ALIGN", (0, 0), (-1, 0), "LEFT")
     style.add("BOTTOMPADDING", (0, 0), (-1, 0), 8)
     style.add("TOPPADDING", (0, 0), (-1, 0), 8)
-
-    # --- BODY ROWS ---
+    # Body rows
     style.add("FONTNAME", (0, 1), (-1, -1), "SourceSansPro")
     style.add("FONTSIZE", (0, 1), (-1, -1), 10)
-    style.add("TEXTCOLOR", (0, 1), (-1, -1), colors.HexColor("#373737"))
+    style.add("TEXTCOLOR", (0, 1), (-1, -1), colors.HexColor("#31333f"))
     style.add("ALIGN", (1, 1), (-1, -1), "RIGHT")
     style.add("ALIGN", (0, 1), (0, -1), "LEFT")
     style.add("TOPPADDING", (0, 1), (-1, -1), 6)
     style.add("BOTTOMPADDING", (0, 1), (-1, -1), 6)
-
-    # --- ZEBRA STRIPING for even body rows (not header) ---
     for row_idx in range(1, len(data)):
         if row_idx % 2 == 0:
-            style.add("BACKGROUND", (0, row_idx), (-1, row_idx), colors.HexColor("#f4f4f4"))
-
-    # --- RIGHT-ALIGN THE TOTAL COLUMN (header and all rows) ---
-    total_col_idx = len(table_df.columns)
-    style.add("ALIGN", (total_col_idx - 1, 0), (total_col_idx - 1, -1), "RIGHT")
-
-    # --- "Other" row: No bold, no header bg, normal font ---
-    for row_idx in range(1, len(data)):
-        if data[row_idx][0] == "Other":
-            style.add("FONTNAME", (0, row_idx), (-1, row_idx), "SourceSansPro")
-            style.add("BACKGROUND", (0, row_idx), (-1, row_idx), colors.white)
-            style.add("TEXTCOLOR", (0, row_idx), (-1, row_idx), colors.HexColor("#373737"))
-            break
-
-    style.add("GRID", (0, 0), (-1, -1), 0.3, colors.HexColor("#ececec"))
-
+            style.add("BACKGROUND", (0, row_idx), (-1, row_idx), colors.HexColor("#f0f2f6"))
+    # No special styling for the last row
+    # Subtotals column is right-aligned (including header)
+    subtotals_col_idx = len(data[0]) - 1
+    style.add("ALIGN", (subtotals_col_idx, 0), (subtotals_col_idx, -1), "RIGHT")
+    style.add("GRID", (0, 0), (-1, -1), 0.3, colors.HexColor("#e4e5e8"))
     tbl.setStyle(style)
     elements.append(tbl)
     doc.build(elements)
@@ -377,16 +319,11 @@ def export_weekly_pdf_reportlab(table_df, week_days, total_hours) -> bytes:
         pdf_bytes = f.read()
     return pdf_bytes
 
-# -------------------------------
-# MAIN APP LOGIC
-# -------------------------------
 if uploaded_files:
     unique_files = deduplicate_files(uploaded_files)
     if len(unique_files) < len(uploaded_files):
         st.warning("Duplicate files detected by name and size. Only unique files will be processed.")
-
     files_to_process = unique_files
-
     all_allocs = []
     for file in files_to_process:
         df_raw = load_and_clean_mileiq_csv(file)
@@ -423,15 +360,11 @@ if uploaded_files:
         if not week_cols:
             st.warning(f"No data for the week of {week_start.strftime('%Y-%m-%d')}.")
             continue
+        week_cols_str = [c.strftime("%m/%d") for c in week_cols]
         pivot_week = pivot[week_cols].copy().reset_index()
-        pivot_week.columns = ['Client'] + [c.strftime("%Y-%m-%d") for c in week_cols]
-        week_cols_str = [c.strftime("%Y-%m-%d") for c in week_cols]
+        pivot_week.columns = ['Client'] + week_cols_str
         for col in week_cols_str:
             pivot_week[col] = pivot_week[col].apply(lambda x: round_to_quarter_hour(x))
-        pivot_week['Subtotal'] = pivot_week[week_cols_str].sum(axis=1)
-
-        # --- REMOVE clients with 0 total for the week (after rounding) ---
-        cols_to_sum = week_cols_str + ['Subtotal']
         def row_has_hours(row):
             for val in row:
                 try:
@@ -441,8 +374,7 @@ if uploaded_files:
                     if val not in ("", "0"):
                         return True
             return False
-        pivot_week_nozero = pivot_week[pivot_week[cols_to_sum].apply(row_has_hours, axis=1)].reset_index(drop=True)
-
+        pivot_week_nozero = pivot_week[pivot_week[week_cols_str].apply(row_has_hours, axis=1)].reset_index(drop=True)
         st.subheader(f"Editable Billables Table for Week of {week_start.strftime('%Y-%m-%d')}")
         column_config = {col: {"editable": True} for col in week_cols_str}
         edited_table = st.data_editor(
@@ -455,7 +387,6 @@ if uploaded_files:
         edited_table_clean = edited_table[
             (edited_table['Client'] != "")
         ].copy()
-        # Update the original pivot table with edits (if any)
         edited_pivot = pivot.copy()
         for col_date, col_str in zip(week_cols, week_cols_str):
             if col_str in edited_table_clean.columns:
@@ -463,19 +394,21 @@ if uploaded_files:
                     if client in edited_pivot.index:
                         val_str = edited_table_clean.iloc[row_idx][col_str]
                         edited_pivot.loc[client, col_date] = float(val_str) if val_str != "" else 0.0
-
-        # Filter again after edits for PDF
         pdf_input = edited_pivot[week_cols]
         pdf_table, week_days_out, week_start_out = reformat_for_pdf(pdf_input)
         if not week_days_out or week_start_out is None:
             st.warning(f"No valid date columns found for export in week of {week_start.strftime('%Y-%m-%d')}.")
             continue
-        st.subheader(f"Formatted Table (Week of {week_start.strftime('%Y-%m-%d')}, Monday–Saturday)")
-        st.dataframe(pdf_table, use_container_width=True)
+        with st.expander(f"Show Formatted Table for PDF Export (Week of {week_start.strftime('%Y-%m-%d')})"):
+            st.subheader(f"Formatted Table (Week of {week_start.strftime('%Y-%m-%d')}, Monday–Saturday)")
+            st.dataframe(pdf_table, use_container_width=True)
         total_hours = edited_pivot[week_cols].sum().sum()
-        week_md = week_start.strftime("%m-%d")
         total_str = str(int(total_hours)) if total_hours == int(total_hours) else str(total_hours)
-        st.markdown(f"**Total Hours for Week of {week_md}: {total_str}**")
+        yellow_bg = "#fffac1"
+        st.markdown(
+            f'<b>Total Hours:</b> <span style="background-color: {yellow_bg}; padding:2px 6px;">{total_str}</span>',
+            unsafe_allow_html=True
+        )
         pdf_bytes = export_weekly_pdf_reportlab(pdf_table, week_days_out, total_hours)
         st.download_button(
             label=f"Download Billables PDF (Week of {week_start:%Y-%m-%d})",
