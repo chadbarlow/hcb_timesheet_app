@@ -256,7 +256,7 @@ def export_weekly_pdf_reportlab(table_df, week_days, total_hours) -> bytes:
         textColor=colors.HexColor("#31333f"),
     )
     elements = []
-    elements.append(Paragraph("HCB TIMESHEET", header_style))
+    elements.append(Paragraph("HCB Timesheet", header_style))
     week_of_str = f"Week of: <b>{min(week_days).strftime('%B %-d, %Y')}</b>"
     total_hours_str = (
         f'Total Hours: <b><font backcolor="#fffac1" color="#373737">{int(total_hours) if total_hours == int(total_hours) else total_hours}</font></b>'
