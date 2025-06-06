@@ -336,6 +336,20 @@ if uploaded_files:
     if not selected_weeks:
         st.info("Select at least one week to proceed.")
         st.stop()
+
+    # Function to extract the "short" client name
+    def extract_last_name(name):
+        if pd.isnull(name):
+            return ""
+        s = str(name).strip()
+        if s.lower() == "other":
+            return "Other"
+        if "," in s:
+            last = s.split(",")[0].strip()
+            return last
+        parts = s.split()
+        return parts[0] if parts else s
+
     for idx, week_start in enumerate(sorted(selected_weeks)):
         if idx > 0:
             st.markdown("---")
@@ -349,28 +363,15 @@ if uploaded_files:
         all_day_short_names = ['M', 'Tu', 'W', 'Th', 'F', 'S']
         num_days = len(week_cols)
         used_short_names = all_day_short_names[:num_days]
+
         # Build DataFrame with day short names as headers
         pivot_week = pivot[week_cols].copy().reset_index()
         pivot_week.columns = ['Client'] + used_short_names
 
-        # Replace full names with last names (or pre-comma, or first word for "Smith John", never after comma)
-        def extract_last_name(name):
-            if pd.isnull(name):
-                return ""
-            s = str(name).strip()
-            if s.lower() == "other":
-                return "Other"
-            # If name contains a comma, use the part before the comma and strip
-            if "," in s:
-                last = s.split(",")[0].strip()
-                return last
-            # Otherwise, use the first word (for "Smith John")
-            parts = s.split()
-            return parts[0] if parts else s
-
+        # Replace full names with last names (or pre-comma, etc.)
         pivot_week['Client'] = pivot_week['Client'].apply(extract_last_name)
 
-        # Round ALL hours to quarter-hour (for display and for editing)
+        # Round all hours to quarter-hour
         for col in used_short_names:
             pivot_week[col] = pivot_week[col].apply(round_to_quarter_hour)
 
@@ -384,7 +385,9 @@ if uploaded_files:
                         return True
             return False
 
-        pivot_week_nozero = pivot_week[pivot_week[used_short_names].apply(row_has_hours, axis=1)].reset_index(drop=True)
+        pivot_week_nozero = pivot_week[
+            pivot_week[used_short_names].apply(row_has_hours, axis=1)
+        ].reset_index(drop=True)
 
         st.subheader(f"Week of {week_start.strftime('%B %-d')}")
 
@@ -396,10 +399,12 @@ if uploaded_files:
             key=f"pivot_edit_{week_start}",
             column_config=column_config
         )
+
         # --- Dynamically calculate total_hours from the edited table ---
         edited_table_clean = edited_table[(edited_table['Client'] != "")].copy()
         for col in used_short_names:
-            edited_table_clean[col] = pd.to_numeric(edited_table_clean[col], errors='coerce').fillna(0).apply(round_to_quarter_hour)
+            edited_table_clean[col] = pd.to_numeric(edited_table_clean[col], errors='coerce')\
+                                         .fillna(0).apply(round_to_quarter_hour)
         total_hours = edited_table_clean[used_short_names].sum().sum()
         yellow_bg = "#fffac1"
         st.markdown(
@@ -410,19 +415,33 @@ if uploaded_files:
             unsafe_allow_html=True
         )
 
-
-        # --- Update pivot for PDF/Formatted Table using the edited table values ---
+        # --- UPDATE pivot FOR PDF + Formatted Table USING THE EDITED TABLE VALUES ---
         edited_pivot = pivot.copy()
-        for col_date, col_short in zip(week_cols, used_short_names):
-            if col_short in edited_table_clean.columns:
-                for row_idx, client in enumerate(edited_table_clean['Client']):
-                    if client in edited_pivot.index:
-                        val_str = edited_table_clean.iloc[row_idx][col_short]
-                        val = float(val_str) if val_str != "" else 0.0
-                        # Round before saving!
-                        val = round_to_quarter_hour(val)
-                        edited_pivot.loc[client, col_date] = val
 
+        # Build a mapping from each full‐name index to its short name:
+        full_to_short = { full_name: extract_last_name(full_name) for full_name in edited_pivot.index }
+        # Reverse mapping: short_name → full_name
+        short_to_full = { short: full for full, short in full_to_short.items() }
+
+        # Loop over each week‐day column and assign edited values
+        for col_date, col_short in zip(week_cols, used_short_names):
+            if col_short not in edited_table_clean.columns:
+                continue
+
+            for row_idx, client_short in enumerate(edited_table_clean['Client']):
+                # Look up the original full name
+                full_name = short_to_full.get(client_short)
+                if full_name is None:
+                    # No match (shouldn’t happen except if someone typed a completely new name)
+                    continue
+
+                val_str = edited_table_clean.iloc[row_idx][col_short]
+                val = float(val_str) if val_str not in (None, "", 0) else 0.0
+                val = round_to_quarter_hour(val)
+                # Update the pivot at the full_name row, for this date column
+                edited_pivot.loc[full_name, col_date] = val
+
+        # Now reformat for PDF
         pdf_input = edited_pivot[week_cols]
         pdf_table, week_days_out, week_start_out = reformat_for_pdf(pdf_input)
         if not week_days_out or week_start_out is None:
