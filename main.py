@@ -340,7 +340,12 @@ if uploaded_files:
         if idx > 0:
             st.markdown("---")
         week_days = [week_start + datetime.timedelta(days=i) for i in range(6)]
-        week_cols = [col for col in week_days if col in pivot.columns]
+        for day in week_days:
+            if day not in pivot.columns:
+                pivot[day] = 0.0
+        pivot = pivot[week_days]
+        week_cols = week_days
+
         all_day_short_names = ['M', 'Tu', 'W', 'Th', 'F', 'S']
         num_days = len(week_cols)
         used_short_names = all_day_short_names[:num_days]
