@@ -398,9 +398,13 @@ if uploaded_files:
         total_hours = edited_table_clean[used_short_names].sum().sum()
         yellow_bg = "#fffac1"
         st.markdown(
-            f'<b>Total Hours:</b> <span style="background-color: {yellow_bg}; padding:2px 6px;">{int(total_hours) if total_hours == int(total_hours) else total_hours}</span>',
+            f'<b>Total Hours:</b> '
+            f'<span style="background-color: {yellow_bg}; color:#222; padding:2px 6px;">'
+            f'{int(total_hours) if total_hours == int(total_hours) else total_hours}'
+            f'</span>',
             unsafe_allow_html=True
         )
+
 
         # --- Update pivot for PDF/Formatted Table using the edited table values ---
         edited_pivot = pivot.copy()
