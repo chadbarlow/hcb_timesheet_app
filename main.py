@@ -47,22 +47,23 @@ def round_to_quarter_hour(hours: float) -> float:
 def load_and_clean_mileiq_csv(uploaded_file) -> pd.DataFrame:
     content = uploaded_file.read().decode("utf-8")
     lines = content.splitlines()
-    header_row = next(
-        (i for i, line in enumerate(lines) if "START_DATE*" in line), None
-    )
+    header_row = next((i for i, line in enumerate(lines) if "START_DATE*" in line), None)
     if header_row is None:
         st.error(f"Header 'START_DATE*' not found in {uploaded_file.name}.")
         st.stop()
     df = pd.read_csv(StringIO(content), skiprows=header_row)
     mask = df["START_DATE*"].astype(str).str.match(r"^\d{1,2}/\d{1,2}/\d{4} \d{1,2}:\d{2}")
     df = df.loc[mask].copy()
-    df = df.drop(columns=[c for c in df.columns if any(p in c for p in ["CATEGORY","RATE","MILES"])], errors="ignore")
+    df = df.drop(
+        columns=[c for c in df.columns if any(p in c for p in ["CATEGORY", "RATE", "MILES"])],
+        errors="ignore"
+    )
     return df
 
 def parse_timestamps(df: pd.DataFrame) -> pd.DataFrame:
     fmt = "%m/%d/%Y %H:%M"
     df["start"] = pd.to_datetime(df["START_DATE*"], format=fmt)
-    df["end"] = pd.to_datetime(df["END_DATE*"], format=fmt)
+    df["end"]   = pd.to_datetime(df["END_DATE*"], format=fmt)
     return df
 
 def extract_sites(df: pd.DataFrame) -> pd.DataFrame:
@@ -82,8 +83,8 @@ def extract_sites(df: pd.DataFrame) -> pd.DataFrame:
 def dynamic_clamp(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
     df["date"] = df["start"].dt.normalize()
-    depart = (df["orig_type"] == "Homeowner") | (df["origin"] == "Office")
-    arrive = (df["dest_type"] == "Homeowner") | (df["destin"] == "Office")
+    depart = (df["orig_type"]=="Homeowner") | (df["origin"]=="Office")
+    arrive = (df["dest_type"]=="Homeowner") | (df["destin"]=="Office")
     starts = df.loc[depart].groupby("date")["start"].min()
     ends   = df.loc[arrive].groupby("date")["end"].max()
     df = df.join(starts.rename("day_start"), on="date")
@@ -91,7 +92,7 @@ def dynamic_clamp(df: pd.DataFrame) -> pd.DataFrame:
     df["clamped_start"] = df[["start","day_start"]].max(axis=1)
     df["clamped_end"]   = df[["end","day_end"]].min(axis=1)
     df = df[df["clamped_end"] > df["clamped_start"]].copy()
-    df["duration_hr"] = (df["clamped_end"] - df["clamped_start"]).dt.total_seconds() / 3600
+    df["duration_hr"] = (df["clamped_end"] - df["clamped_start"]).dt.total_seconds()/3600
     return df
 
 def build_segments(df: pd.DataFrame) -> List[Dict]:
@@ -103,8 +104,8 @@ def build_segments(df: pd.DataFrame) -> List[Dict]:
             "orig_type": a["orig_type"], "dest_type": a["dest_type"],
             "orig_name": a["origin"], "dest_name": a["destin"]
         })
-        if a["clamped_end"].date() == b["clamped_start"].date() and b["clamped_start"] > a["clamped_end"]:
-            gap = (b["clamped_start"] - a["clamped_end"]).total_seconds()/3600
+        if a["clamped_end"].date()==b["clamped_start"].date() and b["clamped_start"]>a["clamped_end"]:
+            gap = (b["clamped_start"]-a["clamped_end"]).total_seconds()/3600
             segs.append({
                 "start": a["clamped_end"], "end": b["clamped_start"], "duration": gap,
                 "orig_type": a["dest_type"], "dest_type": b["orig_type"],
@@ -133,22 +134,23 @@ def allocate_hours(segs: List[Dict]) -> pd.DataFrame:
         elif s["dest_type"]=="Homeowner":
             owner = s["dest_name"]
         else:
-            i = bisect.bisect_right(ends, s["start"]) - 1
+            i = bisect.bisect_right(ends, s["start"])-1
             j = bisect.bisect_left(starts, s["end"])
             owner = (arr[i]["dest_name"] if i>=0 else None) or (dep[j]["orig_name"] if j<len(starts) else None) or "Other"
         alloc.append((s["start"].date(), owner, s["duration"]))
     return pd.DataFrame(alloc, columns=["date","client","hours"])
 
 def pivot_billables(df: pd.DataFrame) -> pd.DataFrame:
-    df["date"]   = pd.to_datetime(df["date"])
-    df["client"] = df["client"].apply(lambda x: "Other" if isinstance(x,str) and "sittler" in x.lower() else x)
+    df["date"] = pd.to_datetime(df["date"])
+    df["client"] = df["client"].apply(
+        lambda x: "Other" if isinstance(x,str) and "sittler" in x.lower() else x
+    )
     p = df.pivot_table(index="client", columns="date", values="hours", aggfunc="sum", fill_value=0)
     p.columns = sorted(pd.to_datetime(c) for c in p.columns)
     if "Other" in p.index:
         other = p.loc[["Other"]]
-        p = p.drop("Other", axis=0).append(other)  # pandas <2.0
-        # for pandas>=2.0, use:
-        # p = pd.concat([p.drop("Other",axis=0), other], axis=0)
+        p = p.drop("Other", axis=0)
+        p = pd.concat([p, other], axis=0)
     return p
 
 def get_monday(d: datetime.date) -> datetime.date:
@@ -171,7 +173,6 @@ def reformat_for_pdf(p: pd.DataFrame):
     df.index = [str(i).title() for i in p.index]
     table = df.reset_index()
     table.columns = ["Client"] + day_labels + ["Subtotals"]
-    # drop zero-only rows except "Other"
     nz = table[day_labels].astype(float).any(axis=1)
     zeros = table[~nz]
     table = table[nz]
@@ -181,11 +182,9 @@ def reformat_for_pdf(p: pd.DataFrame):
     return table, week_order, monday
 
 def export_weekly_pdf_reportlab(table_df, week_days, total_hours) -> bytes:
-    # blank zeros
     clean = table_df.copy()
     for c in clean.columns:
         clean[c] = clean[c].apply(lambda x: "" if isinstance(x,(int,float)) and x==0 else x)
-
     tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
     doc = SimpleDocTemplate(
         tmp.name, pagesize=landscape(letter),
@@ -215,7 +214,7 @@ def export_weekly_pdf_reportlab(table_df, week_days, total_hours) -> bytes:
     ]
     data = [list(clean.columns)] + clean.values.tolist()
     page_w = landscape(letter)[0] - doc.leftMargin - doc.rightMargin
-    widths = [2.8*inch] + [(page_w - 2.8*inch)/(len(data[0])-1)]*(len(data[0])-1)
+    widths = [2.8*inch] + [(page_w-2.8*inch)/(len(data[0])-1)]*(len(data[0])-1)
     tbl = Table(data, colWidths=widths, repeatRows=1)
     style = TableStyle([
         ("BACKGROUND",(0,0),(-1,0),colors.HexColor("#f0f2f6")),
@@ -241,22 +240,19 @@ def export_weekly_pdf_reportlab(table_df, week_days, total_hours) -> bytes:
 # ---- MAIN ----
 
 uploaded_files = st.file_uploader(
-    "Upload MileIQ CSVs",
-    type="csv",
-    accept_multiple_files=True
+    "Upload MileIQ CSVs", type="csv", accept_multiple_files=True
 )
 
 if uploaded_files:
-    # dedupe
     seen, unique = set(), []
     for f in uploaded_files:
         key = (f.name, f.size)
         if key not in seen:
             unique.append(f)
             seen.add(key)
-    if len(unique) < len(uploaded_files):
+    if len(unique)<len(uploaded_files):
         st.warning("Duplicate files ignored.")
-    # process
+
     all_allocs = []
     for f in unique:
         df0 = load_and_clean_mileiq_csv(f)
@@ -270,7 +266,7 @@ if uploaded_files:
 
     weeks = find_available_weeks(pivot.columns)
     today = datetime.date.today()
-    default = get_monday(today) if get_monday(today) in weeks else (weeks and [weeks[-1]] or [])
+    default = get_monday(today) if get_monday(today) in weeks else ([weeks[-1]] if weeks else [])
 
     selected = st.multiselect(
         "Select week(s)", options=weeks,
@@ -278,8 +274,7 @@ if uploaded_files:
         default=default
     )
     if not selected:
-        st.info("Pick at least one week.")
-        st.stop()
+        st.info("Pick at least one week."); st.stop()
 
     def extract_short(n):
         if pd.isnull(n): return ""
@@ -300,21 +295,21 @@ if uploaded_files:
             df_wk[c] = df_wk[c].apply(round_to_quarter_hour)
         df_wk = df_wk[(df_wk[cols]!=0).any(axis=1)]
 
-        # blank zeros in editor
+        # Blank zeros for display
         display_df = df_wk.copy()
         for c in cols:
             display_df[c] = display_df[c].apply(lambda x: "" if x==0 else x)
 
         edited = st.data_editor(display_df, key=f"edit_{wk}", use_container_width=True)
 
-        # numeric total
+        # Numeric total
         numeric = edited.copy()
         for c in cols:
             numeric[c] = pd.to_numeric(numeric[c], errors="coerce").fillna(0)
         total = numeric[cols].sum().sum()
         total = int(total) if total==int(total) else total
 
-        # apply edits back
+        # Apply edits back
         full = pivot.copy()
         f2s = {fn: extract_short(fn) for fn in full.index}
         s2f = {s:fn for fn,s in f2s.items()}
@@ -322,18 +317,16 @@ if uploaded_files:
             short = row["Client"]
             fn = s2f.get(short)
             if not fn: continue
-            for cs,day in zip(cols, days):
+            for cs, day in zip(cols, days):
                 val = row[cs] or 0
                 full.loc[fn, day] = round_to_quarter_hour(float(val))
 
         table_df, week_days, _ = reformat_for_pdf(full[days])
         pdf_bytes = export_weekly_pdf_reportlab(table_df, week_days, total)
 
-        # inline viewer
         b64 = base64.b64encode(pdf_bytes).decode("ascii")
         st.markdown(
-            f'<iframe src="data:application/pdf;base64,{b64}" '
-            'width="100%" height="500px" style="border:none;"></iframe>',
+            f'<iframe src="data:application/pdf;base64,{b64}" width="100%" height="500px" style="border:none;"></iframe>',
             unsafe_allow_html=True
         )
         st.markdown("---")
