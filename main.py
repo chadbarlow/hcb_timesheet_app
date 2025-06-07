@@ -297,6 +297,7 @@ if uploaded_files:
 
     for wk in sorted(selected):
         st.markdown("---")
+        st.markdown(f"### Week of {wk:%B %d, %Y}")
         # regenerate pivot for this week
         days = [wk + datetime.timedelta(days=i) for i in range(6)]
         sub = pivot.reindex(columns=days, fill_value=0)
