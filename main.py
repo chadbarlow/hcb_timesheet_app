@@ -359,7 +359,6 @@ if uploaded_files:
             unsafe_allow_html=True
         )
 
-        st.markdown("---")
         st.download_button(
             label=f"Download PDF (Week of {wk:%Y-%m-%d})",
             data=pdf_bytes,
