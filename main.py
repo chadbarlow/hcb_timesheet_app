@@ -208,6 +208,12 @@ def reformat_for_pdf(pivot: pd.DataFrame):
     return data, week_order, monday
 
 def export_weekly_pdf_reportlab(table_df, week_days, total_hours) -> bytes:
+    # — blank zero cells —
+    clean_df = table_df.copy()
+    for col in clean_df.columns:
+        clean_df[col] = clean_df[col].apply(
+            lambda x: "" if isinstance(x, (int, float)) and x == 0 else x
+        )
     tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".pdf")
     doc = SimpleDocTemplate(tmp.name, pagesize=landscape(letter),
                             leftMargin=0.5*inch, rightMargin=0.5*inch,
@@ -301,9 +307,17 @@ if uploaded_files:
             df_wk[c] = df_wk[c].apply(round_to_quarter_hour)
         df_wk = df_wk[ (df_wk[cols] != 0).any(axis=1) ]
 
+        # Show blanks instead of zeros in the editor
+        display_df = df_wk.copy()
+        for c in cols:
+            display_df[c] = display_df[c].apply(lambda x: "" if x == 0 else x)
+        
         edited = st.data_editor(
-            df_wk, key=f"pivot_edit_{wk}", use_container_width=True
+            display_df,
+            key=f"pivot_edit_{wk}",
+            use_container_width=True
         )
+
 
         # total
         num = edited[[*cols]].sum().sum()
