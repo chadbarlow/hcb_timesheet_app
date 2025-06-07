@@ -217,7 +217,6 @@ def export_weekly_pdf_reportlab(table_df, week_days, total_hours) -> bytes:
     widths = [2.8*inch] + [(page_w-2.8*inch)/(len(data[0])-1)]*(len(data[0])-1)
     tbl = Table(data, colWidths=widths, repeatRows=1)
     style = TableStyle([
-        # Header row styling
         ("BACKGROUND",    (0, 0), (-1, 0),   colors.HexColor("#f0f2f6")),
         ("TEXTCOLOR",     (0, 0), (-1, 0),   colors.HexColor("#31333f")),
         ("FONTNAME",      (0, 0), (-1, 0),   "SourceSansPro"),
@@ -226,27 +225,20 @@ def export_weekly_pdf_reportlab(table_df, week_days, total_hours) -> bytes:
         ("ALIGN",         (-1, 0), (-1, 0),  "RIGHT"),
         ("BOTTOMPADDING", (0, 0), (-1, 0),   8),
         ("TOPPADDING",    (0, 0), (-1, 0),   8),
-    
-        # Body row styling (match header scheme)
+
         ("FONTNAME",      (0, 1), (-1, -1),  "SourceSansPro"),
         ("FONTSIZE",      (0, 1), (-1, -1),  10),
         ("TEXTCOLOR",     (0, 1), (-1, -1),  colors.HexColor("#31333f")),
         ("TOPPADDING",    (0, 1), (-1, -1),  8),
         ("BOTTOMPADDING", (0, 1), (-1, -1),  8),
-    
-        # Grid lines and alignment
+
         ("GRID",          (0, 0), (-1, -1),  0.3, colors.HexColor("#e4e5e8")),
         ("ALIGN",         (1, 1), (-1, -1),  "RIGHT"),
         ("ALIGN",         (0, 1), (0, -1),   "LEFT"),
     ])
-    
-    # Then apply alternating row background as before:
     for r in range(1, len(data)):
         if r % 2 == 0:
             style.add("BACKGROUND", (0, r), (-1, r), colors.HexColor("#f0f2f6"))
-    
-    tbl.setStyle(style)
-
     tbl.setStyle(style)
     elems.append(tbl)
     doc.build(elems)
@@ -266,7 +258,7 @@ if uploaded_files:
         if key not in seen:
             unique.append(f)
             seen.add(key)
-    if len(unique)<len(uploaded_files):
+    if len(unique) < len(uploaded_files):
         st.warning("Duplicate files ignored.")
 
     all_allocs = []
@@ -285,67 +277,82 @@ if uploaded_files:
     default = get_monday(today) if get_monday(today) in weeks else ([weeks[-1]] if weeks else [])
 
     selected = st.multiselect(
-        "Select week(s)", options=weeks,
+        "Select week(s)",
+        options=weeks,
         format_func=lambda d: d.strftime("%Y-%m-%d"),
         default=default
     )
     if not selected:
-        st.info("Pick at least one week."); st.stop()
+        st.info("Pick at least one week.")
+        st.stop()
 
     def extract_short(n):
-        if pd.isnull(n): return ""
+        if pd.isnull(n):
+            return ""
         s = str(n).strip()
         return s.split(",")[0] if "," in s else s.split()[0]
 
     for wk in sorted(selected):
         st.markdown("---")
         days = [wk + datetime.timedelta(days=i) for i in range(6)]
-        sub = pivot.reindex(columns=days, fill_value=0)
         cols = ["M","Tu","W","Th","F","S"][:len(days)]
 
+        # Build initial display DataFrame
+        sub = pivot.reindex(columns=days, fill_value=0)
         df_wk = sub.reset_index()
         df_wk["Client"] = df_wk["client"].apply(extract_short)
         df_wk = df_wk[["Client"] + days]
         df_wk.columns = ["Client"] + cols
         for c in cols:
             df_wk[c] = df_wk[c].apply(round_to_quarter_hour)
-        df_wk = df_wk[(df_wk[cols]!=0).any(axis=1)]
-
-        # Blank zeros for display
+        df_wk = df_wk[(df_wk[cols] != 0).any(axis=1)]
         display_df = df_wk.copy()
         for c in cols:
-            display_df[c] = display_df[c].apply(lambda x: "" if x==0 else x)
+            display_df[c] = display_df[c].apply(lambda x: "" if x == 0 else x)
 
-        edited = st.data_editor(display_df, key=f"edit_{wk}", use_container_width=True)
+        # Persist edits in session_state
+        edit_key = f"edited_{wk}"
+        if edit_key not in st.session_state:
+            st.session_state[edit_key] = display_df
 
-        # Numeric total
+        # Editable table
+        edited = st.data_editor(
+            st.session_state[edit_key],
+            key=edit_key,
+            use_container_width=True
+        )
+        st.session_state[edit_key] = edited
+
+        # Compute total hours
         numeric = edited.copy()
         for c in cols:
             numeric[c] = pd.to_numeric(numeric[c], errors="coerce").fillna(0)
         total = numeric[cols].sum().sum()
-        total = int(total) if total==int(total) else total
+        total = int(total) if total == int(total) else total
 
-        # Apply edits back
+        # Apply edits back to full pivot
         full = pivot.copy()
         f2s = {fn: extract_short(fn) for fn in full.index}
-        s2f = {s:fn for fn,s in f2s.items()}
+        s2f = {short: fn for fn, short in f2s.items()}
         for _, row in edited.iterrows():
-            short = row["Client"]
-            fn = s2f.get(short)
-            if not fn: continue
+            fn = s2f.get(row["Client"])
+            if not fn:
+                continue
             for cs, day in zip(cols, days):
                 val = row[cs] or 0
                 full.loc[fn, day] = round_to_quarter_hour(float(val))
 
+        # Generate and show PDF preview
         table_df, week_days, _ = reformat_for_pdf(full[days])
         pdf_bytes = export_weekly_pdf_reportlab(table_df, week_days, total)
-
         b64 = base64.b64encode(pdf_bytes).decode("ascii")
         st.markdown(
-            f'<iframe src="data:application/pdf;base64,{b64}" width="100%" height="500px" style="border:none;"></iframe>',
+            f'<iframe src="data:application/pdf;base64,{b64}" '
+            'width="100%" height="500px" style="border:none;"></iframe>',
             unsafe_allow_html=True
         )
-        st.markdown("---")
+
+        # Download button
         st.download_button(
             label=f"Download PDF (Week of {wk:%Y-%m-%d})",
             data=pdf_bytes,
