@@ -218,7 +218,7 @@ def export_weekly_pdf_reportlab(table_df, week_days, total_hours) -> bytes:
     tbl = Table(data, colWidths=widths, repeatRows=1)
     style = TableStyle([
         ("BACKGROUND", (0,0), (-1,0), colors.HexColor("#f0f2f6")),
-        ("TEXTCOLOR", (0,0), (-1,0), colors.HexColor("#81828a")),
+        ("TEXTCOLOR", (0,0), (-1,0), colors.HexColor("#373737")),
         ("FONTNAME", (0,0), (-1,0), "SourceSansPro"),
         ("FONTSIZE", (0,0), (-1,0), 10),
         ("ALIGN", (0,0), (-2,0), "LEFT"),         # header all left except last col
