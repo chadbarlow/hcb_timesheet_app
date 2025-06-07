@@ -317,7 +317,7 @@ if uploaded_files:
         num = edited[[*cols]].sum().sum()
         num = int(num) if num==int(num) else num
         # st.markdown(f"**Total Hours:** <span style='background:#fffac1;padding:2px'>{num}</span>",
-                    unsafe_allow_html=True)
+                    # unsafe_allow_html=True)
 
         # regenerate full-index pivot and apply edits
         full = pivot.copy()
