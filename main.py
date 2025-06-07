@@ -169,10 +169,15 @@ def pivot_billables(df: pd.DataFrame) -> pd.DataFrame:
     )
     pivot.columns = [pd.to_datetime(c) for c in pivot.columns]
     pivot = pivot.reindex(sorted(pivot.columns), axis=1)
+
+    # --- replace .append() with pd.concat() ---
     if 'Other' in pivot.index:
         other = pivot.loc[['Other']]
-        pivot = pivot.drop('Other').append(other)
+        pivot = pivot.drop('Other', axis=0, errors='ignore')
+        pivot = pd.concat([pivot, other], axis=0)
+
     return pivot
+
 
 def get_monday(date):
     return date - datetime.timedelta(days=date.weekday())
