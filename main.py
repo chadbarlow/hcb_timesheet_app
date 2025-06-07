@@ -343,13 +343,13 @@ if uploaded_files:
         )
 
 
-        # # ← Back to editor
-        # if st.button("← Back to editor", key=f"back_{wk}"):
-        #     for k in list(st.session_state):
-        #         if k.startswith("pivot_edit_"):
-        #             del st.session_state[k]
-        #     st.experimental_rerun()
-
+        st.download_button(
+            label=f"Download PDF (Week of {wk:%Y-%m-%d})",
+            data=pdf_bytes,
+            file_name=f"Billables_Week_of_{wk:%Y-%m-%d}.pdf",
+            mime="application/pdf",
+            key=f"download_btn_{wk}"
+        )
         # Inline viewer
         b64 = base64.b64encode(pdf_bytes).decode("ascii")
         # st.markdown("**View PDF inline:**")
@@ -359,10 +359,3 @@ if uploaded_files:
             unsafe_allow_html=True
         )
 
-        st.download_button(
-            label=f"Download PDF (Week of {wk:%Y-%m-%d})",
-            data=pdf_bytes,
-            file_name=f"Billables_Week_of_{wk:%Y-%m-%d}.pdf",
-            mime="application/pdf",
-            key=f"download_btn_{wk}"
-        )
