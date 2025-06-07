@@ -343,12 +343,12 @@ if uploaded_files:
         )
 
 
-        # ← Back to editor
-        if st.button("← Back to editor", key=f"back_{wk}"):
-            for k in list(st.session_state):
-                if k.startswith("pivot_edit_"):
-                    del st.session_state[k]
-            st.experimental_rerun()
+        # # ← Back to editor
+        # if st.button("← Back to editor", key=f"back_{wk}"):
+        #     for k in list(st.session_state):
+        #         if k.startswith("pivot_edit_"):
+        #             del st.session_state[k]
+        #     st.experimental_rerun()
 
         # Inline viewer
         b64 = base64.b64encode(pdf_bytes).decode("ascii")
