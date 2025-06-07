@@ -217,29 +217,36 @@ def export_weekly_pdf_reportlab(table_df, week_days, total_hours) -> bytes:
     widths = [2.8*inch] + [(page_w-2.8*inch)/(len(data[0])-1)]*(len(data[0])-1)
     tbl = Table(data, colWidths=widths, repeatRows=1)
     style = TableStyle([
-        ("BACKGROUND", (0,0), (-1,0), colors.HexColor("#f0f2f6")),
-        ("TEXTCOLOR", (0,0), (-1,0), colors.HexColor("#31333f")),
-        ("TEXTCOLOR", (0,1), (-1,-1), colors.HexColor("#31333f")),
-        ("FONTNAME", (0,0), (-1,0), "SourceSansPro"),
-        ("FONTSIZE", (0,0), (-1,0), 10),
-        ("ALIGN", (0,0), (-2,0), "LEFT"),         # header all left except last col
-        ("ALIGN", (-1,0), (-1,0), "RIGHT"),       # last header cell right-aligned
-        ("BOTTOMPADDING", (0,0), (-1,0), 8),
-        ("TOPPADDING", (0,0), (-1,0), 8),
+        # Header row styling
+        ("BACKGROUND",    (0, 0), (-1, 0),   colors.HexColor("#f0f2f6")),
+        ("TEXTCOLOR",     (0, 0), (-1, 0),   colors.HexColor("#31333f")),
+        ("FONTNAME",      (0, 0), (-1, 0),   "SourceSansPro"),
+        ("FONTSIZE",      (0, 0), (-1, 0),   10),
+        ("ALIGN",         (0, 0), (-2, 0),   "LEFT"),
+        ("ALIGN",         (-1, 0), (-1, 0),  "RIGHT"),
+        ("BOTTOMPADDING", (0, 0), (-1, 0),   8),
+        ("TOPPADDING",    (0, 0), (-1, 0),   8),
     
-        # Add padding for body rows to match header
-        ("TOPPADDING", (0,1), (-1,-1), 8),
-        ("BOTTOMPADDING", (0,1), (-1,-1), 8),
+        # Body row styling (match header scheme)
+        ("FONTNAME",      (0, 1), (-1, -1),  "SourceSansPro"),
+        ("FONTSIZE",      (0, 1), (-1, -1),  10),
+        ("TEXTCOLOR",     (0, 1), (-1, -1),  colors.HexColor("#31333f")),
+        ("TOPPADDING",    (0, 1), (-1, -1),  8),
+        ("BOTTOMPADDING", (0, 1), (-1, -1),  8),
     
-        ("GRID", (0,0), (-1,-1), 0.3, colors.HexColor("#e4e5e8")),
-        ("ALIGN", (1,1), (-1,-1), "RIGHT"),
-        ("ALIGN", (0,1), (0,-1), "LEFT"),
+        # Grid lines and alignment
+        ("GRID",          (0, 0), (-1, -1),  0.3, colors.HexColor("#e4e5e8")),
+        ("ALIGN",         (1, 1), (-1, -1),  "RIGHT"),
+        ("ALIGN",         (0, 1), (0, -1),   "LEFT"),
     ])
-        
+    
+    # Then apply alternating row background as before:
+    for r in range(1, len(data)):
+        if r % 2 == 0:
+            style.add("BACKGROUND", (0, r), (-1, r), colors.HexColor("#f0f2f6"))
+    
+    tbl.setStyle(style)
 
-    for r in range(1,len(data)):
-        if r%2==0:
-            style.add("BACKGROUND",(0,r),(-1,r),colors.HexColor("#f0f2f6"))
     tbl.setStyle(style)
     elems.append(tbl)
     doc.build(elems)
