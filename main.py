@@ -7,6 +7,7 @@ import tempfile
 from io import StringIO
 from typing import List, Dict
 import os
+import base64
 
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
@@ -453,8 +454,30 @@ if uploaded_files:
             st.dataframe(pdf_table, use_container_width=True)
 
         pdf_bytes = export_weekly_pdf_reportlab(pdf_table, week_days_out, total_hours)
+        # 1) Decode and embed for inline viewing
+        b64 = base64.b64encode(pdf_bytes).decode("ascii")
+        pdf_data_url = f"data:application/pdf;base64,{b64}"
+        
+        # 2) “Back” button brings user back to the editor view
+        if st.button("← Back to editor", key=f"back_{week_start}"):
+            # Remove any per‐week editing state so the editor reappears
+            for k in list(st.session_state):
+                if k.startswith("pivot_edit_"):
+                    del st.session_state[k]
+            st.experimental_rerun()
+        
+        st.markdown("**View PDF inline:**")
+        st.markdown(
+            f'<iframe src="{pdf_data_url}" '
+            'width="100%" height="500px" style="border:none;"></iframe>',
+            unsafe_allow_html=True,
+        )
+        
+        st.markdown("---")
+        
+        # 3) Keep the download button as a secondary option
         st.download_button(
-            label=f"Download Billables PDF (Week of {week_start:%Y-%m-%d})",
+            label=f"Download PDF (Week of {week_start:%Y-%m-%d})",
             data=pdf_bytes,
             file_name=f"Billables_Week_of_{week_start:%Y-%m-%d}.pdf",
             mime="application/pdf",
