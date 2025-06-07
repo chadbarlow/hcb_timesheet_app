@@ -33,7 +33,7 @@ registerFontFamily(
     boldItalic="SourceSansPro-Bold"
 )
 
-st.title("MileIQ Billables Processor, Editor, and PDF Export")
+st.title("Heartwood Custom Builders")
 
 def round_to_quarter_hour(hours: float) -> float:
     if pd.isnull(hours):
@@ -41,7 +41,7 @@ def round_to_quarter_hour(hours: float) -> float:
     return math.ceil(float(hours) * 4) / 4
 
 uploaded_files = st.file_uploader(
-    "Upload one or more MileIQ CSVs (duplicate files will be ignored)",
+    "Upload MileIQ CSVs",
     type=["csv"],
     accept_multiple_files=True
 )
@@ -220,9 +220,9 @@ def export_weekly_pdf_reportlab(table_df, week_days, total_hours) -> bytes:
     elems.append(Paragraph("HCB TIMESHEET", header))
     elems.append(Paragraph(f"Employee: <b>Chad Barlow</b>", label))
     elems.append(Paragraph(f"Week of: <b>{min(week_days).strftime('%B %-d, %Y')}</b>", label))
-    elems.append(Paragraph(
-        f'Total Hours: <b><font backcolor="#fffac1" color="#373737">{int(total_hours) if total_hours == int(total_hours) else total_hours}</font></b>',
-        label))
+    # elems.append(Paragraph(
+    #     f'Total Hours: <b><font backcolor="#fffac1" color="#373737">{int(total_hours) if total_hours == int(total_hours) else total_hours}</font></b>',
+    #     label))
     elems.append(Spacer(1, 0.18*inch))
 
     data = [list(table_df.columns)] + table_df.values.tolist()
@@ -352,7 +352,7 @@ if uploaded_files:
 
         # Inline viewer
         b64 = base64.b64encode(pdf_bytes).decode("ascii")
-        st.markdown("**View PDF inline:**")
+        # st.markdown("**View PDF inline:**")
         st.markdown(
             f'<iframe src="data:application/pdf;base64,{b64}" '
             'width="100%" height="500px" style="border:none;"></iframe>',
