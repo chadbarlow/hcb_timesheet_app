@@ -41,7 +41,7 @@ def round_to_quarter_hour(hours: float) -> float:
     return math.ceil(float(hours) * 4) / 4
 
 uploaded_files = st.file_uploader(
-    # "Upload MileIQ CSVs",
+    "Upload MileIQ CSVs",
     type=["csv"],
     accept_multiple_files=True
 )
