@@ -331,10 +331,17 @@ if uploaded_files:
             for col_short,day in zip(cols, days):
                 val = row[col_short] or 0
                 full.loc[full_name, day] = round_to_quarter_hour(float(val))
-
+        
+        # 1) Unpack only the table and week_days (discard week_start)
+        table_df, week_days, _ = reformat_for_pdf(full[days])
+        
+        # 2) Call with exactly the three positional args your function expects
         pdf_bytes = export_weekly_pdf_reportlab(
-            *reformat_for_pdf(full[days]), total_hours=num
+            table_df,
+            week_days,
+            num
         )
+
 
         # ← Back to editor
         if st.button("← Back to editor", key=f"back_{wk}"):
