@@ -308,8 +308,8 @@ if uploaded_files:
         # total
         num = edited[[*cols]].sum().sum()
         num = int(num) if num==int(num) else num
-        st.markdown(f"**Total Hours:** <span style='background:#fffac1;padding:2px'>{num}</span>",
-                    unsafe_allow_html=True)
+        # st.markdown(f"**Total Hours:** <span style='background:#fffac1;padding:2px'>{num}</span>",
+        #             unsafe_allow_html=True)
 
         # regenerate full-index pivot and apply edits
         full = pivot.copy()
@@ -335,16 +335,8 @@ if uploaded_files:
         )
 
 
-        # ← Back to editor
-        if st.button("← Back to editor", key=f"back_{wk}"):
-            for k in list(st.session_state):
-                if k.startswith("pivot_edit_"):
-                    del st.session_state[k]
-            st.experimental_rerun()
-
         # Inline viewer
         b64 = base64.b64encode(pdf_bytes).decode("ascii")
-        st.markdown("**View PDF inline:**")
         st.markdown(
             f'<iframe src="data:application/pdf;base64,{b64}" '
             'width="100%" height="500px" style="border:none;"></iframe>',
