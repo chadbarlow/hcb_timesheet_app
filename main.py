@@ -118,7 +118,7 @@ def export_pdf(tbl_df, w_days, total_hrs):
 
 # --- UI ---
 st.set_page_config(layout="wide")
-st.title("MileIQ Billables Processor, Editor, and PDF Export")
+st.title("Heartwood Custom Builders Timesheet Generator")
 files = st.file_uploader("Upload MileIQ CSVs (duplicates ignored)", type=["csv"], accept_multiple_files=True)
 
 if files:
@@ -149,7 +149,7 @@ if files:
         
         total_h = edited[cols].sum().sum()
         th_str = int(total_h) if total_h == int(total_h) else round(total_h, 2)
-        st.markdown(f"**Total Hours:** <span style='background:#fffac1;color:black;padding:2px 4px;border-radius:3px;'>{th_str}</span>", unsafe_allow_html=True)
+        # st.markdown(f"**Total Hours:** <span style='background:#fffac1;color:black;padding:2px 4px;border-radius:3px;'>{th_str}</span>", unsafe_allow_html=True)
 
         p_copy = p.copy()
         for _, row in edited.iterrows():
