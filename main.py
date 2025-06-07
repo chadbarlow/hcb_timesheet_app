@@ -220,9 +220,9 @@ def export_weekly_pdf_reportlab(table_df, week_days, total_hours) -> bytes:
     elems.append(Paragraph("HCB TIMESHEET", header))
     elems.append(Paragraph(f"Employee: <b>Chad Barlow</b>", label))
     elems.append(Paragraph(f"Week of: <b>{min(week_days).strftime('%B %-d, %Y')}</b>", label))
-    # elems.append(Paragraph(
-    #     f'Total Hours: <b><font backcolor="#fffac1" color="#373737">{int(total_hours) if total_hours == int(total_hours) else total_hours}</font></b>',
-    #     label))
+    elems.append(Paragraph(
+        f'Total Hours: <b><font backcolor="#fffac1" color="#373737">{int(total_hours) if total_hours == int(total_hours) else total_hours}</font></b>',
+        label))
     elems.append(Spacer(1, 0.18*inch))
 
     data = [list(table_df.columns)] + table_df.values.tolist()
@@ -316,7 +316,7 @@ if uploaded_files:
         # total
         num = edited[[*cols]].sum().sum()
         num = int(num) if num==int(num) else num
-        st.markdown(f"**Total Hours:** <span style='background:#fffac1;padding:2px'>{num}</span>",
+        # st.markdown(f"**Total Hours:** <span style='background:#fffac1;padding:2px'>{num}</span>",
                     unsafe_allow_html=True)
 
         # regenerate full-index pivot and apply edits
