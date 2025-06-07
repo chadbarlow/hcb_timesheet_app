@@ -41,7 +41,7 @@ def round_to_quarter_hour(hours: float) -> float:
     return math.ceil(float(hours) * 4) / 4
 
 uploaded_files = st.file_uploader(
-    "Upload MileIQ CSVs",
+    # "Upload MileIQ CSVs",
     type=["csv"],
     accept_multiple_files=True
 )
@@ -259,7 +259,6 @@ def export_weekly_pdf_reportlab(table_df, week_days, total_hours) -> bytes:
     with open(tmp.name, "rb") as f:
         return f.read()
 
-
 # ---- MAIN ----
 
 if uploaded_files:
@@ -310,27 +309,28 @@ if uploaded_files:
         df_wk.columns = ['Client'] + cols
         for c in cols:
             df_wk[c] = df_wk[c].apply(round_to_quarter_hour)
-        # drop all-zero rows
-        df_wk = df_wk[(df_wk[cols] != 0).any(axis=1)]
-        # blank out zero cells
-        df_wk = df_wk.replace(0, "")
+        # drop all-zero rows and blank out zeros
+        df_wk = df_wk[(df_wk[cols] != 0).any(axis=1)].replace(0, "")
 
         edited = st.data_editor(
             df_wk, key=f"pivot_edit_{wk}", use_container_width=True
         )
 
         # recalculate total (treat blanks as zero)
-        num = edited[cols].replace("", 0).sum().sum()
+        num = edited[cols] \
+            .applymap(lambda x: float(x) if x not in ("", None) else 0.0) \
+            .sum().sum()
         num = int(num) if num == int(num) else num
 
-        # apply any edits back to full pivot
+        # apply edits back to full pivot
         full = pivot.copy()
         map_full2short = {full_name: extract_short(full_name) for full_name in full.index}
         map_short2full = {short: full for full, short in map_full2short.items()}
         for _, row in edited.iterrows():
             short = row['Client']
             full_name = map_short2full.get(short)
-            if not full_name: continue
+            if not full_name:
+                continue
             for col_short, day in zip(cols, days):
                 val = row[col_short] or 0
                 full.loc[full_name, day] = round_to_quarter_hour(float(val))
@@ -339,7 +339,7 @@ if uploaded_files:
         pdf_bytes = export_weekly_pdf_reportlab(table_df, week_days, num)
 
         st.download_button(
-            label=f"Download PDF",
+            label="Download PDF",
             data=pdf_bytes,
             file_name=f"Timesheet_Week_of_{wk:%Y-%m-%d}.pdf",
             mime="application/pdf",
