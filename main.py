@@ -206,7 +206,7 @@ def export_weekly_pdf_reportlab(table_df, week_days, total_hours) -> bytes:
         Paragraph(f"Employee: <b>Chad Barlow</b>", label),
         Paragraph(f"Week of: <b>{min(week_days):%B %-d, %Y}</b>", label),
         Paragraph(
-            f'Total Hours: <b><font backcolor="#fffac1" color="#373737">'
+            f'Total Hours: <b><font backcolor="#fffac1">'
             f'{int(total_hours) if total_hours==int(total_hours) else total_hours}'
             f'</font></b>', label
         ),
@@ -218,7 +218,7 @@ def export_weekly_pdf_reportlab(table_df, week_days, total_hours) -> bytes:
     tbl = Table(data, colWidths=widths, repeatRows=1)
     style = TableStyle([
         ("BACKGROUND", (0,0), (-1,0), colors.HexColor("#f0f2f6")),
-        ("TEXTCOLOR", (0,0), (-1,0), colors.HexColor("#373737")),
+        ("TEXTCOLOR", (0,0), (-1,0), colors.HexColor("#31333f")),
         ("FONTNAME", (0,0), (-1,0), "SourceSansPro"),
         ("FONTSIZE", (0,0), (-1,0), 10),
         ("ALIGN", (0,0), (-2,0), "LEFT"),         # header all left except last col
