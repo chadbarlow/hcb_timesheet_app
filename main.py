@@ -170,14 +170,12 @@ def pivot_billables(df: pd.DataFrame) -> pd.DataFrame:
     pivot.columns = [pd.to_datetime(c) for c in pivot.columns]
     pivot = pivot.reindex(sorted(pivot.columns), axis=1)
 
-    # --- replace .append() with pd.concat() ---
     if 'Other' in pivot.index:
         other = pivot.loc[['Other']]
         pivot = pivot.drop('Other', axis=0, errors='ignore')
         pivot = pd.concat([pivot, other], axis=0)
 
     return pivot
-
 
 def get_monday(date):
     return date - datetime.timedelta(days=date.weekday())
@@ -205,6 +203,9 @@ def reformat_for_pdf(pivot: pd.DataFrame):
     if 'Other' in data.loc[~mask, 'Client'].values:
         keep = data.loc[~mask]
         data = data.loc[mask].append(keep)
+    # blank out zeros for PDF
+    for col in day_labels + ['Subtotals']:
+        data[col] = data[col].apply(lambda x: "" if x == 0 else x)
     return data, week_order, monday
 
 def export_weekly_pdf_reportlab(table_df, week_days, total_hours) -> bytes:
@@ -249,13 +250,13 @@ def export_weekly_pdf_reportlab(table_df, week_days, total_hours) -> bytes:
         ("ALIGN",         (1, 1), (-1, -1),  "RIGHT"),
         ("ALIGN",         (0, 1), (0, -1),   "LEFT"),
     ])
-    for r in range(1,len(data)):
-        if r%2==0:
-            style.add("BACKGROUND",(0,r),(-1,r),colors.HexColor("#f0f2f6"))
+    for r in range(1, len(data)):
+        if r % 2 == 0:
+            style.add("BACKGROUND", (0, r), (-1, r), colors.HexColor("#f0f2f6"))
     tbl.setStyle(style)
     elems.append(tbl)
     doc.build(elems)
-    with open(tmp.name,"rb") as f:
+    with open(tmp.name, "rb") as f:
         return f.read()
 
 
@@ -298,7 +299,8 @@ if uploaded_files:
     for wk in sorted(selected):
         st.markdown("---")
         st.markdown(f"### Week of {wk:%B %d, %Y}")
-        # regenerate pivot for this week
+
+        # build week-specific pivot
         days = [wk + datetime.timedelta(days=i) for i in range(6)]
         sub = pivot.reindex(columns=days, fill_value=0)
         cols = ['M','Tu','W','Th','F','S'][:len(days)]
@@ -308,41 +310,33 @@ if uploaded_files:
         df_wk.columns = ['Client'] + cols
         for c in cols:
             df_wk[c] = df_wk[c].apply(round_to_quarter_hour)
-        df_wk = df_wk[ (df_wk[cols] != 0).any(axis=1) ]
+        # drop all-zero rows
+        df_wk = df_wk[(df_wk[cols] != 0).any(axis=1)]
+        # blank out zero cells
+        df_wk = df_wk.replace(0, "")
 
         edited = st.data_editor(
             df_wk, key=f"pivot_edit_{wk}", use_container_width=True
         )
 
-        # total
-        num = edited[[*cols]].sum().sum()
-        num = int(num) if num==int(num) else num
-        # st.markdown(f"**Total Hours:** <span style='background:#fffac1;padding:2px'>{num}</span>",
-                    # unsafe_allow_html=True)
+        # recalculate total (treat blanks as zero)
+        num = edited[cols].replace("", 0).sum().sum()
+        num = int(num) if num == int(num) else num
 
-        # regenerate full-index pivot and apply edits
+        # apply any edits back to full pivot
         full = pivot.copy()
-        # build reverse lookup
         map_full2short = {full_name: extract_short(full_name) for full_name in full.index}
-        map_short2full = {short:full for full,short in map_full2short.items()}
-        for i,row in edited.iterrows():
+        map_short2full = {short: full for full, short in map_full2short.items()}
+        for _, row in edited.iterrows():
             short = row['Client']
             full_name = map_short2full.get(short)
             if not full_name: continue
-            for col_short,day in zip(cols, days):
+            for col_short, day in zip(cols, days):
                 val = row[col_short] or 0
                 full.loc[full_name, day] = round_to_quarter_hour(float(val))
-        
-        # 1) Unpack only the table and week_days (discard week_start)
-        table_df, week_days, _ = reformat_for_pdf(full[days])
-        
-        # 2) Call with exactly the three positional args your function expects
-        pdf_bytes = export_weekly_pdf_reportlab(
-            table_df,
-            week_days,
-            num
-        )
 
+        table_df, week_days, _ = reformat_for_pdf(full[days])
+        pdf_bytes = export_weekly_pdf_reportlab(table_df, week_days, num)
 
         st.download_button(
             label=f"Download PDF",
@@ -351,12 +345,10 @@ if uploaded_files:
             mime="application/pdf",
             key=f"download_btn_{wk}"
         )
-        # Inline viewer
+
         b64 = base64.b64encode(pdf_bytes).decode("ascii")
-        # st.markdown("**View PDF inline:**")
         st.markdown(
             f'<iframe src="data:application/pdf;base64,{b64}" '
             'width="100%" height="500px" style="border:none;"></iframe>',
             unsafe_allow_html=True
         )
-
