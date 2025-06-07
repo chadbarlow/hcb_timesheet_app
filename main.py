@@ -345,7 +345,7 @@ if uploaded_files:
 
 
         st.download_button(
-            label=f"Download PDF)",
+            label=f"Download PDF",
             data=pdf_bytes,
             file_name=f"Timesheet_Week_of_{wk:%Y-%m-%d}.pdf",
             mime="application/pdf",
