@@ -109,7 +109,11 @@ def export_pdf(tbl_df, w_days, total_hrs):
         data = [list(tbl_df.columns)] + tbl_df.apply(lambda row: row.map(lambda x: int(x) if isinstance(x, float) and x==int(x) else x), axis=1).values.tolist()
         widths = [2.8*inch] + [(landscape(letter)[0] - doc.leftMargin - doc.rightMargin - 2.8*inch)/(len(data[0])-1)]*(len(data[0])-1)
         tbl = Table(data, colWidths=widths, repeatRows=1)
-        style = [("BACKGROUND",(0,0),(-1,0),colors.HexColor("#f0f2f6")),("TEXTCOLOR",(0,0),(-1,0),colors.HexColor("#31333f")),("FONTNAME",(0,0),(-1,0),"SourceSansPro-Bold"),("FONTSIZE",(0,0),(-1,0),10),("ALIGN",(0,0),(-2,0),"LEFT"),("ALIGN",(-1,0),(-1,0),"RIGHT"),("BOTTOMPADDING",(0,0),(-1,0),8),("TOPPADDING",(0,0),(-1,0),8),("FONTNAME",(0,1),(-1,-1),"SourceSansPro"),("FONTSIZE",(0,1),(-1,-1),10),("TEXTCOLOR",(0,1),(-1,-1),colors.HexColor("#31333f")),("TOPPADDING",(0,1),(-1,-1),8),("BOTTOMPADDING",(0,1),(-1,-1),8),("GRID",(0,0),(-1,-1),0.3,colors.HexColor("#e4e5e8")),("ALIGN",(1,1),(-1,-1),"RIGHT"),("ALIGN",(0,1),(0,-1),"LEFT")] + [("BACKGROUND",(0,r),(-1,r),colors.HexColor("#f0f2f6")) for r in range(1,len(data)) if r%2!=0]
+        # style = [("BACKGROUND",(0,0),(-1,0),colors.HexColor("#f0f2f6")),("TEXTCOLOR",(0,0),(-1,0),colors.HexColor("#31333f")),("FONTNAME",(0,0),(-1,0),"SourceSansPro-Bold"),("FONTSIZE",(0,0),(-1,0),10),("ALIGN",(0,0),(-2,0),"LEFT"),("ALIGN",(-1,0),(-1,0),"RIGHT"),("BOTTOMPADDING",(0,0),(-1,0),8),("TOPPADDING",(0,0),(-1,0),8),("FONTNAME",(0,1),(-1,-1),"SourceSansPro"),("FONTSIZE",(0,1),(-1,-1),10),("TEXTCOLOR",(0,1),(-1,-1),colors.HexColor("#31333f")),("TOPPADDING",(0,1),(-1,-1),8),("BOTTOMPADDING",(0,1),(-1,-1),8),("GRID",(0,0),(-1,-1),0.3,colors.HexColor("#e4e5e8")),("ALIGN",(1,1),(-1,-1),"RIGHT"),("ALIGN",(0,1),(0,-1),"LEFT")] + [("BACKGROUND",(0,r),(-1,r),colors.HexColor("#f0f2f6")) for r in range(1,len(data)) if r%2!=0]
+        style += [
+            # Apply to all rows except the header: start at row 1, go through the last row
+            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [None, colors.HexColor("#f0f2f6")])
+        ]
         tbl.setStyle(TableStyle(style))
         elems.append(tbl); doc.build(elems)
         with open(tmp.name, "rb") as f: pdf_bytes = f.read()
