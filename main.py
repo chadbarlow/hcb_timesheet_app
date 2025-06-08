@@ -41,9 +41,11 @@ def parse_ts(df):
     return df
 
 def extract_sites(df):
-    o = df['START*'].str.rsplit('|',1,expand=True)
-    d = df['STOP*'].str.rsplit('|',1,expand=True)
-    df['origin'], df['destin'] = np.where(o[1].str.strip()=='Homeowner', o[0], o[1]), np.where(d[1].str.strip()=='Homeowner', d[0], d[1])
+    o = df['START*'].astype(str).str.rsplit('|', 1, True)
+    d = df['STOP*'].astype(str).str.rsplit('|', 1, True)
+    df = df.assign(on=o[0].str.strip(), ot=o[1].str.strip(), dn=d[0].str.strip(), dt=d[1].str.strip())
+    df = df.assign(origin=np.where(df['ot'] == 'Homeowner', df['on'], df['ot']), 
+                   destin=np.where(df['dt'] == 'Homeowner', df['dn'], df['dt']))
     return df.sort_values('start').reset_index(drop=True)
 
 def clamp(df):
