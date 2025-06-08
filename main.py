@@ -87,20 +87,39 @@ def pivot_bills(df):
 
 # --- PDF GENERATION ---
 def reformat_pdf(p):
-    # turn any NaN into 0 so the mapper never sees NaN
-    tbl_df = tbl_df.fillna(0)
-    if p.empty: return pd.DataFrame(), [], datetime.date.today()
+    # 1) turn any NaN into 0 on the pivot DataFrame
+    p = p.fillna(0)
+
+    # 2) if it’s empty, bail out
+    if p.empty:
+        return pd.DataFrame(), [], datetime.date.today()
+
+    # 3) determine the Monday of the first column’s week
     mon = min(p.columns) - datetime.timedelta(days=min(p.columns).weekday())
+
+    # 4) build the six weekdays (Mon–Sat) for that week
     w_days = [mon + datetime.timedelta(days=i) for i in range(6)]
-    d_labels = ['M','Tu','W','Th','F','S']
+    d_labels = ['M', 'Tu', 'W', 'Th', 'F', 'S']
+
+    # 5) assemble a DataFrame with those days plus a Subtotals column
     df = pd.DataFrame({d: p.get(d, 0) for d in w_days})
     df['Subtotals'] = df.sum(axis=1)
     df.index = [str(i).title() for i in p.index]
-    tbl = df.reset_index(); tbl.columns = ['Client'] + d_labels + ['Subtotals']
+
+    # 6) reset index & rename columns for the PDF table
+    tbl = df.reset_index()
+    tbl.columns = ['Client'] + d_labels + ['Subtotals']
+
+    # 7) drop any rows with all zeros (but keep “Other” if it’s the only one)
     mask = (tbl[d_labels] != 0).any(axis=1)
-    if 'Other' in tbl.loc[~mask, 'Client'].values: tbl = pd.concat([tbl[mask], tbl.loc[(~mask) & (tbl['Client'] == 'Other')]])
-    else: tbl = tbl[mask]
+    if 'Other' in tbl.loc[~mask, 'Client'].values:
+        tbl = pd.concat([tbl[mask], tbl.loc[(~mask) & (tbl['Client'] == 'Other')]])
+    else:
+        tbl = tbl[mask]
+
+    # 8) return the final table, the day list, and the week’s Monday
     return tbl.reset_index(drop=True), w_days, mon
+
 def export_pdf(tbl_df, w_days, total_hrs):
     with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
         # Set up the document
