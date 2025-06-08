@@ -107,7 +107,8 @@ if files:
         days=[wk+datetime.timedelta(days=i) for i in range(6)]
         df_wk = pd.DataFrame({'Client': p.index})
         for day in days:
-            df_wk[day] = p[day]_
+            df_wk[day] = p[day] if day in p.columns else 0.0
+
 
         edited=st.data_editor(df_wk,key=str(wk),use_container_width=True)
         total_h=edited.iloc[:,1:].sum().sum()
