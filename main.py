@@ -9,6 +9,8 @@ from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import inch
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
 from reportlab.lib.enums import TA_CENTER
+from streamlit.components.v1 import html
+
 
 # --- FONT SETUP ---
 try:
@@ -311,6 +313,7 @@ if files:
         pdf_bytes = export_pdf(tbl_df, w_days, total_h)
         b64 = base64.b64encode(pdf_bytes).decode()
     
+        # … above this you already have pdf_bytes and b64 …
         st.download_button(
             label=f"Download PDF (Week of {wk:%Y-%m-%d})",
             data=pdf_bytes,
@@ -318,7 +321,7 @@ if files:
             mime="application/pdf",
             key=f"dl_{wk}"
         )
-    
+        
         # Use <embed> instead of <iframe> so Chrome desktop will allow it
         embed_html = f'''
         <embed
@@ -328,6 +331,8 @@ if files:
           height="600px"
         />
         '''
-        html(embed_html, height=620)
-    
+        # Render it via the html component
+        html(embedHtml, height=620)
+        
         st.markdown("---")
+
