@@ -318,11 +318,16 @@ if files:
             mime="application/pdf",
             key=f"dl_{wk}"
         )
-        st.markdown(
-            f'<iframe src="data:application/pdf;base64,{b64}" '
-            f'width="100%" height="500" '
-            f'style="border:1px solid #e0e0e0;"></iframe>',
-            unsafe_allow_html=True
-        )
+    
+        # Use <embed> instead of <iframe> so Chrome desktop will allow it
+        embed_html = f'''
+        <embed
+          src="data:application/pdf;base64,{b64}"
+          type="application/pdf"
+          width="100%"
+          height="600px"
+        />
+        '''
+        html(embed_html, height=620)
+    
         st.markdown("---")
-
