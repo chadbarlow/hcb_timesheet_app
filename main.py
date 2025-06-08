@@ -318,10 +318,17 @@ if files:
             mime="application/pdf",
             key=f"dl_{wk}"
         )
-        # --- CORRECTED CODE ---
-        # Use an <embed> tag to display the PDF inline, which is more reliable
-        # across browsers for base64 sources than an <iframe>.
+        # --- FINAL RECOMMENDED CODE ---
+        # This approach provides the best cross-browser compatibility.
+        # It uses the <object> tag which is often better supported on desktop for PDFs,
+        # and includes the <embed> tag as a fallback for other browsers (like mobile Safari)
+        # where it is known to work.
+        
         st.markdown(
-            f'<embed src="data:application/pdf;base64,{b64}" width="100%" type="application/pdf">',
+            f"""
+            <object data="data:application/pdf;base64,{b64}" type="application/pdf" width="100%" height="500">
+                <embed src="data:application/pdf;base64,{b64}" type="application/pdf" />
+            </object>
+            """,
             unsafe_allow_html=True,
         )
