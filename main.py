@@ -326,7 +326,7 @@ if files:
         
         st.markdown(
             f"""
-            <object data="data:application/pdf;base64,{b64}" type="application/pdf" width="100%" height="500">
+            <object data="data:application/pdf;base64,{b64}" type="application/pdf" width="100%" >
                 <embed src="data:application/pdf;base64,{b64}" type="application/pdf" />
             </object>
             """,
