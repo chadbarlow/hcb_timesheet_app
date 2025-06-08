@@ -41,12 +41,14 @@ def parse_ts(df):
     return df
 
 def extract_sites(df):
-    o = df['START*'].astype(str).str.rsplit('|', 1, True)
-    d = df['STOP*'].astype(str).str.rsplit('|', 1, True)
-    df = df.assign(on=o[0].str.strip(), ot=o[1].str.strip(), dn=d[0].str.strip(), dt=d[1].str.strip())
+    o = df['START*'].astype(str).str.rsplit('|', n=1, expand=True)
+    d = df['STOP*'].astype(str).str.rsplit('|', n=1, expand=True)
+    df = df.assign(on=o[0].str.strip(), ot=o[1].str.strip(),
+                   dn=d[0].str.strip(), dt=d[1].str.strip())
     df = df.assign(origin=np.where(df['ot'] == 'Homeowner', df['on'], df['ot']), 
                    destin=np.where(df['dt'] == 'Homeowner', df['dn'], df['dt']))
     return df.sort_values('start').reset_index(drop=True)
+
 
 def clamp(df):
     df['cs'], df['ce'] = df.groupby(df['start'].dt.date)['start'].transform('min'), df.groupby(df['end'].dt.date)['end'].transform('max')
