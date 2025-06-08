@@ -87,6 +87,8 @@ def pivot_bills(df):
 
 # --- PDF GENERATION ---
 def reformat_pdf(p):
+    # turn any NaN into 0 so the mapper never sees NaN
+    tbl_df = tbl_df.fillna(0)
     if p.empty: return pd.DataFrame(), [], datetime.date.today()
     mon = min(p.columns) - datetime.timedelta(days=min(p.columns).weekday())
     w_days = [mon + datetime.timedelta(days=i) for i in range(6)]
