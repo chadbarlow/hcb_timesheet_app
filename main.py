@@ -325,4 +325,3 @@ if files:
             f'<embed src="data:application/pdf;base64,{b64}" width="100%" type="application/pdf">',
             unsafe_allow_html=True,
         )
-        st.markdown("---")
