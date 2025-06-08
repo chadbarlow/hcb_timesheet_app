@@ -12,6 +12,7 @@ from reportlab.lib.enums import TA_CENTER
 from streamlit.components.v1 import html
 
 
+
 # --- FONT SETUP ---
 try:
     font_dir = os.path.join(os.path.dirname(__file__), "fonts")
@@ -323,6 +324,9 @@ if files:
         )
         
         # Use <embed> instead of <iframe> so Chrome desktop will allow it
+        # … after your download_button …
+        
+        # Use <embed> instead of <iframe> so Chrome desktop will allow it
         embed_html = f'''
         <embed
           src="data:application/pdf;base64,{b64}"
@@ -331,8 +335,9 @@ if files:
           height="600px"
         />
         '''
+        
         # Render it via the html component
-        html(embedHtml, height=620)
+        html(embed_html, height=620)
         
         st.markdown("---")
 
