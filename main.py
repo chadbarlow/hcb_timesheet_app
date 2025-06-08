@@ -120,9 +120,6 @@ def reformat_pdf(p):
     # 8) return the final table, the day list, and the week’s Monday
     return tbl.reset_index(drop=True), w_days, mon
 
-# --- CORRECTED export_pdf FUNCTION ---
-# Replace the entire function in your new script with this one.
-
 def export_pdf(tbl_df, w_days, total_hrs):
     with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
         # Set up the document
@@ -183,8 +180,7 @@ def export_pdf(tbl_df, w_days, total_hrs):
         # Create the table
         tbl = Table(data, colWidths=widths, repeatRows=1)
 
-        # --- THIS IS THE FIX ---
-        # We are using the older, manual method for zebra-striping which is known to be compatible.
+        # Base table style
         style = [
             ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#f0f2f6")),
             ("TEXTCOLOR", (0, 0), (-1, 0), colors.HexColor("#31333f")),
@@ -203,10 +199,14 @@ def export_pdf(tbl_df, w_days, total_hrs):
             ("ALIGN", (1, 1), (-1, -1), "RIGHT"),
             ("ALIGN", (0, 1), (0, -1), "LEFT"),
         ]
-        # Manually add background colors for odd rows (skipping the header)
-        for r in range(1, len(data)):
-            if r % 2 != 0:
-                style.append(("BACKGROUND", (0, r), (-1, r), colors.HexColor("#f0f2f6")))
+
+        # Zebra‐stripe even rows by alternating backgrounds
+        style.append((
+            "ROWBACKGROUNDS",
+            (0, 1),    # from first data row
+            (-1, -1),  # through the last row
+            [None, colors.HexColor("#f0f2f6")]
+        ))
 
         # Apply style and build
         tbl.setStyle(TableStyle(style))
@@ -318,11 +318,17 @@ if files:
             mime="application/pdf",
             key=f"dl_{wk}"
         )
-
+        # --- FINAL RECOMMENDED CODE ---
+        # This approach provides the best cross-browser compatibility.
+        # It uses the <object> tag which is often better supported on desktop for PDFs,
+        # and includes the <embed> tag as a fallback for other browsers (like mobile Safari)
+        # where it is known to work.
         
         st.markdown(
-            f'<iframe src="data:application/pdf;base64,{b64}" '
-            f'width="100%" height="500" '
-            f'style="border:1px solid #e0e0e0;"></iframe>',
-            unsafe_allow_html=True
+            f"""
+            <object data="data:application/pdf;base64,{b64}" type="application/pdf" width="100%" height="500">
+                <embed src="data:application/pdf;base64,{b64}" type="application/pdf" />
+            </object>
+            """,
+            unsafe_allow_html=True,
         )
