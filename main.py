@@ -322,7 +322,7 @@ if files:
         # Use an <embed> tag to display the PDF inline, which is more reliable
         # across browsers for base64 sources than an <iframe>.
         st.markdown(
-            f'<embed src="data:application/pdf;base64,{b64}" width="100%" height="500" type="application/pdf">',
+            f'<embed src="data:application/pdf;base64,{b64}" width="100%" type="application/pdf">',
             unsafe_allow_html=True,
         )
         st.markdown("---")
