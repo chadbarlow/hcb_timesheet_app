@@ -223,32 +223,85 @@ if files:
     short2full = {s: f for f, s in full2short.items()}
 
     for wk in sorted(sel_weeks):
+        # Header for this week
         st.markdown(f"### Week of {wk:%B %d, %Y}")
-        days, cols = [wk + datetime.timedelta(days=i) for i in range(6)], ['M','Tu','W','Th','F','S']
-        
-        df_wk = pd.DataFrame({'Client': [full2short.get(i) for i in p.index]})
-        for c, d in zip(cols, days): df_wk[c] = p.get(d, 0).reset_index(drop=True).apply(r_q_h)
+    
+        # Build list of dates and column labels
+        days = [wk + datetime.timedelta(days=i) for i in range(6)]
+        cols = ['M','Tu','W','Th','F','S']
+    
+        # --- Build the editable DataFrame ---
+        df_wk = pd.DataFrame({
+            'Client': [full2short.get(i) for i in p.index]
+        })
+        n_clients = len(p.index)
+    
+        for col_label, date in zip(cols, days):
+            if date in p.columns:
+                series = p[date]
+            else:
+                # if the pivot has no column for this date, use a zero Series
+                series = pd.Series([0] * n_clients, index=p.index)
+    
+            # reset_index so it lines up, then apply rounding
+            df_wk[col_label] = series.reset_index(drop=True).apply(r_q_h)
+    
+        # drop any client rows with all zeros
         df_wk = df_wk.loc[(df_wk[cols] != 0).any(axis=1)].reset_index(drop=True)
-        
-        edited = st.data_editor(df_wk, key=f"edit_{wk}", use_container_width=True, hide_index=True)
-        
+    
+        # Let the user edit
+        edited = st.data_editor(
+            df_wk,
+            key=f"edit_{wk}",
+            use_container_width=True,
+            hide_index=True
+        )
+    
+        # Compute total hours
         total_h = edited[cols].sum().sum()
         th_str = int(total_h) if total_h == int(total_h) else round(total_h, 2)
-        st.markdown(f"**Total Hours:** <span style='background:#fffac1;color:black;padding:2px 4px;border-radius:3px;'>{th_str}</span>", unsafe_allow_html=True)
-
+        st.markdown(
+            f"**Total Hours:** "
+            f"<span style='background:#fffac1;color:black;"
+            f"padding:2px 4px;border-radius:3px;'>{th_str}</span>",
+            unsafe_allow_html=True
+        )
+    
+        # Apply edits back into a copy of the pivot
         p_copy = p.copy()
         for _, row in edited.iterrows():
             fn = short2full.get(row['Client'])
             if fn:
-                for col_s, day in zip(cols, days): p_copy.loc[fn, day] = r_q_h(row.get(col_s) or 0)
-        
-        tbl_df, w_days, _ = reformat_pdf(p_copy.reindex(columns=days, fill_value=0))
-        if tbl_df.empty and total_h > 0: # Handle case where all hours are on Sat/Sun
-             tbl_df, w_days, _ = reformat_pdf(p_copy.reindex(columns=[wk + datetime.timedelta(days=i) for i in range(7)], fill_value=0))
-        
+                for col_label, date in zip(cols, days):
+                    p_copy.loc[fn, date] = r_q_h(row[col_label] or 0)
+    
+        # Reformat for PDF
+        tbl_df, w_days, _ = reformat_pdf(
+            p_copy.reindex(columns=days, fill_value=0)
+        )
+        if tbl_df.empty and total_h > 0:
+            # fallback in case everyone’s hours were on weekend
+            full_week = [wk + datetime.timedelta(days=i) for i in range(7)]
+            tbl_df, w_days, _ = reformat_pdf(
+                p_copy.reindex(columns=full_week, fill_value=0)
+            )
+    
+        # Generate and display PDF
         pdf_bytes = export_pdf(tbl_df, w_days, total_h)
         b64 = base64.b64encode(pdf_bytes).decode()
-        
-        st.download_button(label=f"Download PDF (Week of {wk:%Y-%m-%d})", data=pdf_bytes, file_name=f"HCB_Timesheet_{wk:%Y-%m-%d}.pdf", mime="application/pdf", key=f"dl_{wk}")
-        st.markdown(f'<iframe src="data:application/pdf;base64,{b64}" width="100%" height="500" style="border:1px solid #e0e0e0;"></iframe>', unsafe_allow_html=True)
+    
+        st.download_button(
+            label=f"Download PDF (Week of {wk:%Y-%m-%d})",
+            data=pdf_bytes,
+            file_name=f"HCB_Timesheet_{wk:%Y-%m-%d}.pdf",
+            mime="application/pdf",
+            key=f"dl_{wk}"
+        )
+        st.markdown(
+            f'<iframe src="data:application/pdf;base64,{b64}" '
+            f'width="100%" height="500" '
+            f'style="border:1px solid #e0e0e0;"></iframe>',
+            unsafe_allow_html=True
+        )
         st.markdown("---")
+
