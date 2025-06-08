@@ -105,7 +105,10 @@ if files:
     sel_weeks=st.multiselect("Select weeks",weeks,default=[get_mon(datetime.date.today())] or weeks[-1:])
     for wk in sel_weeks:
         days=[wk+datetime.timedelta(days=i) for i in range(6)]
-        df_wk=pd.DataFrame({'Client':p.index}).join(p[days].T.reset_index(drop=True).T.reset_index(drop=True))
+        df_wk = pd.DataFrame({'Client': p.index})
+        for day in days:
+            df_wk[day] = p[day]_
+
         edited=st.data_editor(df_wk,key=str(wk),use_container_width=True)
         total_h=edited.iloc[:,1:].sum().sum()
         pdf_bytes=export_pdf(edited,days,total_h)
